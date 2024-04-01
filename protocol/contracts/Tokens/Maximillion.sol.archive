@@ -1,0 +1,47 @@
+pragma solidity ^0.8.20;
+
+import "./LuTokens/LuNEON.sol";
+
+/**
+ * @title LmnFi's Maximillion Contract
+ * @author LmnFi
+ */
+contract Maximillion {
+    /**
+     * @notice The default lunb market to repay in
+     */
+    LuNEON public lunb;
+
+    /**
+     * @notice Construct a Maximillion to repay max in a LuNEON market
+     */
+    constructor(LuNEON lunb_) public {
+        lunb = lunb_;
+    }
+
+    /**
+     * @notice msg.sender sends NEON to repay an account's borrow in the lunb market
+     * @dev The provided NEON is applied towards the borrow balance, any excess is refunded
+     * @param borrower The address of the borrower account to repay on behalf of
+     */
+    function repayBehalf(address borrower) public payable {
+        repayBehalfExplicit(borrower, lunb);
+    }
+
+    /**
+     * @notice msg.sender sends NEON to repay an account's borrow in a lunb market
+     * @dev The provided NEON is applied towards the borrow balance, any excess is refunded
+     * @param borrower The address of the borrower account to repay on behalf of
+     * @param lunb_ The address of the lunb contract to repay in
+     */
+    function repayBehalfExplicit(address borrower, LuNEON lunb_) public payable {
+        uint received = msg.value;
+        uint borrows = lunb_.borrowBalanceCurrent(borrower);
+        if (received > borrows) {
+            lunb_.repayBorrowBehalf.value(borrows)(borrower);
+            msg.sender.transfer(received - borrows);
+        } else {
+            lunb_.repayBorrowBehalf.value(received)(borrower);
+        }
+    }
+}
