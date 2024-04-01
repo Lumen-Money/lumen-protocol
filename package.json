@@ -1,0 +1,12 @@
+{
+  "name": "Lumen-Protocol",
+  "private": true,
+  "dependencies": {
+    "@hardhat/typechain": "^2.0.0",
+    "@nomicfoundation/hardhat-verify": "^1.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "chai": "5.1.0",
+    "hardhat": "^2.0.0"
+  }
+}
