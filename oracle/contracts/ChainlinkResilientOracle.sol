@@ -3,26 +3,18 @@
 pragma solidity 0.8.20;
 
 import { LuErc20Interface } from "./interfaces/LuErc20Interface.sol";
-import { ResilientOracleInterface} from "./interfaces/OracleInterface.sol";
+import { SimpleOracleInterface} from "./interfaces/OracleInterface.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import { IAccessControlManagerV8 } from "../../governance/contracts/Governance/AccessControlledV8.sol";
+import { IAccessControlManagerV8, AccessControlledV8 } from "../../governance/contracts/Governance/AccessControlledV8.sol";
 
 /**
  * @title ChainlinkResilientOracle
  * @author LmnFi
- * @notice The Resilient Oracle is the main contract that the protocol uses to fetch prices of assets.
+ * @notice The optimized version of the ResilientOracle to support the chainlink only
  *
-
- * In most cases, Chainlink is used as the main oracle, TWAP or Pyth oracles are used as the pivot oracle depending
- * on which supports the given market and Binance oracle is used as the fallback oracle. For some markets we may
- * use Pyth or TWAP as the main oracle if the token price is not supported by Chainlink or Binance oracles.
  *
- * For a fetched price to be valid it must be positive and not stagnant. If the price is invalid then we consider the
- * oracle to be stagnant and treat it like it's disabled.
  */
-contract ChainlinkResilientOracle is ResilientOracleInterface {
-
-    error Unauthorized(address sender, address calledContract, string methodSignature);
+contract ChainlinkResilientOracle is AccessControlledV8, SimpleOracleInterface {
 
     IAccessControlManagerV8 _accessControlManager;
 
@@ -85,8 +77,12 @@ contract ChainlinkResilientOracle is ResilientOracleInterface {
         _checkAccessAllowed("setTokenConfig(TokenConfig)");
 
         require(tokenConfig.maxStalePeriod > 0, "stale period can't be zero");
-        require(tokenConfig.uDecimals > 0, "no_asset_decimals");
-        require(tokenConfig.fDecimals > 0, "no_feed_decimals");
+
+        uint8 uDecimals = IDecimals(tokenConfig.asset).decimals();
+        require(tokenConfig.uDecimals == uDecimals, "invalid_uDecimals");
+
+        uint8 fDecimals = IDecimals(tokenConfig.feed).decimals();
+        require(tokenConfig.fDecimals == fDecimals, "invalid_fDecimals");
 
         tokenConfigs[tokenConfig.asset] = tokenConfig;
         emit TokenConfigAdded(tokenConfig.asset, tokenConfig.feed, tokenConfig.maxStalePeriod);
@@ -105,14 +101,6 @@ contract ChainlinkResilientOracle is ResilientOracleInterface {
         return _getPriceInternal(luToken);
     }
 
-    function updatePrice(address luToken) external {
-        revert("Unsupported");
-    }
-
-    function updateAssetPrice(address asset) external {
-        revert("Unsupported");
-    }
-
     /**
      * @notice Gets the Chainlink price for a given asset
      * @param asset address of the asset
@@ -121,7 +109,7 @@ contract ChainlinkResilientOracle is ResilientOracleInterface {
     function _getPriceInternal(address asset) internal view returns (uint256) {
         TokenConfig memory config = tokenConfigs[asset];
         uint64 decimals = config.uDecimals;
-        require(decimals > 0, "Config_no_Set");
+        require(decimals > 0, "Config_not_Set");
 
         uint price = _getChainlinkPrice(config.feed, config.fDecimals, config.maxStalePeriod);
         uint64 decimalDelta = 18 - decimals;
@@ -163,15 +151,9 @@ contract ChainlinkResilientOracle is ResilientOracleInterface {
         return uint256(answer) * (10 ** decimalDelta);
     }
 
-    /**
-     * @notice Reverts if the call is not allowed by AccessControlManager
-     * @param signature Method signature
-     */
-    function _checkAccessAllowed(string memory signature) internal view {
-        bool isAllowedToCall = _accessControlManager.isAllowedToCall(msg.sender, signature);
+}
 
-        if (!isAllowedToCall) {
-            revert Unauthorized(msg.sender, address(this), signature);
-        }
-    }
+
+interface IDecimals {
+    function decimals() external view returns (uint8);
 }

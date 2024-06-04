@@ -13,6 +13,13 @@ interface ResilientOracleInterface is OracleInterface {
     function getUnderlyingPrice(address luToken) external view returns (uint256);
 }
 
+
+interface SimpleOracleInterface is OracleInterface {
+
+    function getUnderlyingPrice(address luToken) external view returns (uint256);
+}
+
+
 interface TwapInterface is OracleInterface {
     function updateTwap(address asset) external returns (uint256);
 }
