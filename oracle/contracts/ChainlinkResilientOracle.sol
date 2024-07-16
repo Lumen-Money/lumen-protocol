@@ -16,6 +16,9 @@ import { IAccessControlManagerV8, AccessControlledV8 } from "../../governance/co
  */
 contract ChainlinkResilientOracle is AccessControlledV8, SimpleOracleInterface {
 
+    /// @notice Solana fix to support NeonEVM's "block.timestamp" to be behind the Solana's "updatedAt"
+    uint64 constant MAX_SOLANA_FUTURE_TIME = 30 minutes;
+
     IAccessControlManagerV8 _accessControlManager;
 
     struct TokenConfig {
@@ -26,8 +29,9 @@ contract ChainlinkResilientOracle is AccessControlledV8, SimpleOracleInterface {
         address feed;
         /// @notice Price expiration period of this asset
         uint64 maxStalePeriod;
-
+        /// @notice Underlying Token Decimals
         uint64 uDecimals;
+        /// @notice Feed Price Decimals
         uint64 fDecimals;
     }
 
@@ -140,12 +144,12 @@ contract ChainlinkResilientOracle is AccessControlledV8, SimpleOracleInterface {
         (, int256 answer, , uint256 updatedAt, ) = AggregatorV3Interface(feed).latestRoundData();
         if (answer <= 0) revert("chainlink price must be positive");
 
-    // Neon EVM timestamp could be behind the Solana-Feeds updatedAt
-        uint256 deltaTime = block.timestamp > updatedAt
-            ? block.timestamp - updatedAt
-            : updatedAt - block.timestamp;
-
-        require(deltaTime < maxStalePeriod, "Chainlink_Expired");
+        // Neon EVM timestamp could be behind the Solana-Feeds updatedAt
+        if (updatedAt > block.timestamp) {
+            require((updatedAt - block.timestamp) <= MAX_SOLANA_FUTURE_TIME, "NeonEVM_Tx_Expired");
+        } else {
+            require((block.timestamp - updatedAt) <= maxStalePeriod, "Chainlink_Expired");
+        }
 
         uint256 decimalDelta = 18 - decimals;
         return uint256(answer) * (10 ** decimalDelta);
